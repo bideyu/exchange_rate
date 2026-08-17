@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CNY ⇄ TWD 匯率</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQ15fVFREIOW8guS6p+W6lwIiLCJzaG9ydF9uYW1lIjoi5rCR5ouGIiLCJzdGFydF91cmwiOiIiLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMTIxNDE3IiwidGhlbWVfY29sb3IiOiIjMTIxNDE3In0=">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#121417;
+  color:#f0f0f0;
+  font-family:"微軟正黑體",sans-serif;
+  padding:28px 20px;
+  min-height:100vh;
+}
+.card{
+  background:#1e2126;
+  border-radius:18px;
+  padding:26px;
+  max-width:430px;
+  margin:10px auto;
+}
+.rateBig{
+  font-size:28px;
+  font-weight:bold;
+  margin-bottom:14px;
+}
+.infoText{
+  font-size:16px;
+  line-height:1.8;
+  color:#cccccc;
+}
+.btnRefresh{
+  margin-top:20px;
+  width:100%;
+  padding:12px;
+  background:#323842;
+  color:#ffffff;
+  border:0;
+  border-radius:12px;
+  font-size:16px;
+}
+</style>
+</head>
+<body>
+<div class="card">
+<div class="rateBig" id="rate">載入匯率⋯</div>
+<div class="infoText" id="info"></div>
+<button class="btnRefresh" onclick="loadRate()">手動更新匯率</button>
+</div>
+
+<script>
+let previousRate=null;
+
+function loadRate(){
+  fetch("https://api.exchangerate.fun/latest?base=CNY")
+  .then(res=>res.json())
+  .then(data=>{
+    const nowRate = data.rates.TWD;
+    const nowTime = new Date().toLocaleString("zh-TW");
+    let changeText="── 首次讀取";
+
+    if(previousRate!==null){
+      const diff=nowRate-previousRate;
+      if(diff>0) changeText=`📈 +${diff.toFixed(4)}`;
+      else if(diff<0) changeText=`📉 ${diff.toFixed(4)}`;
+      else changeText="➖ 沒有變動";
+    }
+    previousRate=nowRate;
+
+    document.getElementById("rate").innerText=`1 人民幣 = ${nowRate.toFixed(4)} 新台幣`;
+    document.getElementById("info").innerText=`今日變動：${changeText}\n最後更新：${nowTime}`;
+  })
+  .catch(err=>{
+    document.getElementById("rate").innerText="讀取匯率失敗";
+    document.getElementById("info").innerText=err;
+  })
+}
+loadRate();
+setInterval(loadRate,86400000);
+</script>
+</body>
+</html>
+

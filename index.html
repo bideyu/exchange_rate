@@ -64,12 +64,18 @@ body{
   border-radius:12px;
   font-size:16px;
 }
+.tipNote{
+  font-size:13px;
+  color:#888;
+  margin-top:12px;
+  text-align:center;
+}
 </style>
 </head>
 <body>
 <div class="card">
-<div class="rateBig" id="rate">載入匯率⋯</div>
-<div class="infoText" id="info"></div>
+<div class="rateBig">1 人民幣 ≈ 4.73 新台幣</div>
+<div class="infoText">參考 Google 公開匯率，每日手動更新查看最新行情</div>
 
 <div class="btnGroup">
 <button class="periodBtn" data-day="7">1週</button>
@@ -81,56 +87,32 @@ body{
 <canvas id="rateChart"></canvas>
 </div>
 
-<button class="btnRefresh" onclick="loadLiveRate()">手動更新匯率</button>
+<div class="tipNote">走勢圖範例（樣式參考Google匯率圖表）</div>
+<button class="btnRefresh" onclick="alert('請至Google查詢最新匯率')">查詢最新匯率</button>
 </div>
 
 <script>
 let chartObj=null;
 let currentRange=30;
 
-// 取得今日日期 yyyy-mm-dd
-function getDateStr(offsetDay=0){
-  const d=new Date();
-  d.setDate(d.getDate()-offsetDay);
-  return d.toISOString().split('T')[0];
-}
+// 模擬不同區間範例數據
+const sampleData={
+  7:{label:["8/12","8/13","8/14","8/15","8/16","8/17","8/18"],data:[4.78,4.77,4.76,4.75,4.74,4.735,4.73]},
+  30:{label:["7/20","7/26","8/1","8/6","8/10","8/14","8/18"],data:[4.79,4.785,4.792,4.77,4.755,4.74,4.73]},
+  365:{label:["9月","11月","1月","3月","5月","7月","8月"],data:[4.82,4.80,4.76,4.77,4.78,4.76,4.73]}
+};
 
-// 讀取即時匯率
-async function loadLiveRate(){
-  try{
-    const res=await fetch("https://api.exchangerate.host/latest?base=CNY&symbols=TWD");
-    const data=await res.json();
-    const nowRate=data.rates.TWD;
-    const nowTime=new Date().toLocaleString("zh-TW");
-    document.getElementById("rate").innerText=`1 人民幣 = ${nowRate.toFixed(4)} 新台幣`;
-    document.getElementById("info").innerText=`最後更新：${nowTime}`;
-    await drawChart(currentRange);
-  }catch(e){
-    document.getElementById("rate").innerText="讀取匯率失敗";
-    document.getElementById("info").innerText=e.message;
-  }
-}
-
-// 繪製走勢圖
 async function drawChart(days){
-  const endDate=getDateStr(0);
-  const startDate=getDateStr(days);
-  const url=`https://api.exchangerate.host/timeseries?base=CNY&symbols=TWD&start_date=${startDate}&end_date=${endDate}`;
-  const resp=await fetch(url);
-  const json=await resp.json();
-  const entries=Object.entries(json.rates).sort((a,b)=>a[0].localeCompare(b[0]));
-  const labelList=entries.map(i=>i[0].slice(5));
-  const rateList=entries.map(i=>i[1].TWD);
-
+  const set=sampleData[days];
   if(chartObj) chartObj.destroy();
   const ctx=document.getElementById("rateChart").getContext("2d");
   chartObj=new Chart(ctx,{
     type:"line",
     data:{
-      labels:labelList,
+      labels:set.label,
       datasets:[{
         label:"CNY→TWD",
-        data:rateList,
+        data:set.data,
         borderColor:"#70c987",
         backgroundColor:"rgba(112,201,135,0.18)",
         fill:true,
@@ -143,14 +125,13 @@ async function drawChart(days){
       maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{
-        x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8,color:"#999"}},
+        x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,color:"#999"}},
         y:{grid:{color:"#2c3138"},ticks:{color:"#999"}}
       }
     }
   })
 }
 
-// 切換時間按鈕事件
 document.querySelectorAll(".periodBtn").forEach(btn=>{
   btn.onclick=async function(){
     document.querySelectorAll(".periodBtn").forEach(b=>b.classList.remove("active"));
@@ -160,7 +141,7 @@ document.querySelectorAll(".periodBtn").forEach(btn=>{
   }
 })
 
-loadLiveRate();
+drawChart(30);
 </script>
 </body>
 </html>

@@ -5,34 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CNY ⇄ TWD 匯率</title>
 <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiQ15fVFREIOW8guS6p+W6lwIiLCJzaG9ydF9uYW1lIjoi5rCR5ouGIiLCJzdGFydF91cmwiOiIiLCJkaXNwbGF5Ijoic3RhbmRhbG9uZSIsImJhY2tncm91bmRfY29sb3IiOiIjMTIxNDE3IiwidGhlbWVfY29sb3IiOiIjMTIxNDE3In0=">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{
   background:#121417;
   color:#f0f0f0;
   font-family:"微軟正黑體",sans-serif;
-  padding:28px 20px;
+  padding:20px;
   min-height:100vh;
 }
 .card{
   background:#1e2126;
   border-radius:18px;
-  padding:26px;
-  max-width:430px;
+  padding:22px;
+  max-width:460px;
   margin:10px auto;
 }
 .rateBig{
   font-size:28px;
   font-weight:bold;
-  margin-bottom:14px;
+  margin-bottom:10px;
 }
 .infoText{
-  font-size:16px;
-  line-height:1.8;
+  font-size:15px;
+  line-height:1.7;
   color:#cccccc;
+  margin-bottom:18px;
+}
+#chartWrap{
+  width:100%;
+  height:260px;
+}
+.btnGroup{
+  display:flex;
+  gap:8px;
+  margin:16px 0;
+}
+.periodBtn{
+  flex:1;
+  padding:10px;
+  background:#323842;
+  color:#ddd;
+  border:0;
+  border-radius:10px;
+  font-size:15px;
+}
+.periodBtn.active{
+  background:#48895b;
+  color:#fff;
 }
 .btnRefresh{
-  margin-top:20px;
   width:100%;
   padding:12px;
   background:#323842;
@@ -47,38 +70,97 @@ body{
 <div class="card">
 <div class="rateBig" id="rate">載入匯率⋯</div>
 <div class="infoText" id="info"></div>
-<button class="btnRefresh" onclick="loadRate()">手動更新匯率</button>
+
+<div class="btnGroup">
+<button class="periodBtn" data-day="7">1週</button>
+<button class="periodBtn active" data-day="30">1個月</button>
+<button class="periodBtn" data-day="365">1年</button>
+</div>
+
+<div id="chartWrap">
+<canvas id="rateChart"></canvas>
+</div>
+
+<button class="btnRefresh" onclick="loadLiveRate()">手動更新匯率</button>
 </div>
 
 <script>
-let previousRate=null;
+let chartObj=null;
+let currentRange=30;
 
-function loadRate(){
-  fetch("https://api.exchangerate.fun/latest?base=CNY")
-  .then(res=>res.json())
-  .then(data=>{
-    const nowRate = data.rates.TWD;
-    const nowTime = new Date().toLocaleString("zh-TW");
-    let changeText="── 首次讀取";
+// 取得今日日期 yyyy-mm-dd
+function getDateStr(offsetDay=0){
+  const d=new Date();
+  d.setDate(d.getDate()-offsetDay);
+  return d.toISOString().split('T')[0];
+}
 
-    if(previousRate!==null){
-      const diff=nowRate-previousRate;
-      if(diff>0) changeText=`📈 +${diff.toFixed(4)}`;
-      else if(diff<0) changeText=`📉 ${diff.toFixed(4)}`;
-      else changeText="➖ 沒有變動";
-    }
-    previousRate=nowRate;
-
+// 讀取即時匯率
+async function loadLiveRate(){
+  try{
+    const res=await fetch("https://api.exchangerate.host/latest?base=CNY&symbols=TWD");
+    const data=await res.json();
+    const nowRate=data.rates.TWD;
+    const nowTime=new Date().toLocaleString("zh-TW");
     document.getElementById("rate").innerText=`1 人民幣 = ${nowRate.toFixed(4)} 新台幣`;
-    document.getElementById("info").innerText=`今日變動：${changeText}\n最後更新：${nowTime}`;
-  })
-  .catch(err=>{
+    document.getElementById("info").innerText=`最後更新：${nowTime}`;
+    await drawChart(currentRange);
+  }catch(e){
     document.getElementById("rate").innerText="讀取匯率失敗";
-    document.getElementById("info").innerText=err;
+    document.getElementById("info").innerText=e.message;
+  }
+}
+
+// 繪製走勢圖
+async function drawChart(days){
+  const endDate=getDateStr(0);
+  const startDate=getDateStr(days);
+  const url=`https://api.exchangerate.host/timeseries?base=CNY&symbols=TWD&start_date=${startDate}&end_date=${endDate}`;
+  const resp=await fetch(url);
+  const json=await resp.json();
+  const entries=Object.entries(json.rates).sort((a,b)=>a[0].localeCompare(b[0]));
+  const labelList=entries.map(i=>i[0].slice(5));
+  const rateList=entries.map(i=>i[1].TWD);
+
+  if(chartObj) chartObj.destroy();
+  const ctx=document.getElementById("rateChart").getContext("2d");
+  chartObj=new Chart(ctx,{
+    type:"line",
+    data:{
+      labels:labelList,
+      datasets:[{
+        label:"CNY→TWD",
+        data:rateList,
+        borderColor:"#70c987",
+        backgroundColor:"rgba(112,201,135,0.18)",
+        fill:true,
+        tension:0.3,
+        pointRadius:0
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8,color:"#999"}},
+        y:{grid:{color:"#2c3138"},ticks:{color:"#999"}}
+      }
+    }
   })
 }
-loadRate();
-setInterval(loadRate,86400000);
+
+// 切換時間按鈕事件
+document.querySelectorAll(".periodBtn").forEach(btn=>{
+  btn.onclick=async function(){
+    document.querySelectorAll(".periodBtn").forEach(b=>b.classList.remove("active"));
+    this.classList.add("active");
+    currentRange=Number(this.dataset.day);
+    await drawChart(currentRange);
+  }
+})
+
+loadLiveRate();
 </script>
 </body>
 </html>
